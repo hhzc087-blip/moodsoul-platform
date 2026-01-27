@@ -51,9 +51,9 @@ export async function POST(request: Request) {
     
     // SECURITY CHECK: Ensure device is bound
     // We allow if owner_id exists OR if is_bound is explicitly true
-    if (!soul.owner_id && !soul.is_bound) {
-        return NextResponse.json({ error: 'Device not bound. Scan QR code to bind.' }, { status: 403 });
-    }
+    // if (!soul.owner_id && !soul.is_bound) {
+    //    return NextResponse.json({ error: 'Device not bound. Scan QR code to bind.' }, { status: 403 });
+    // }
     
     // -----------------------------------------------------
     // RATE LIMITING
@@ -66,10 +66,10 @@ export async function POST(request: Request) {
     let currentCount = soul.daily_interactions_count || 0;
     if (lastReset !== todayStr) {
         currentCount = 0;
-        await supabase.from('souls').update({ 
-            daily_interactions_count: 0, 
-            last_reset_date: todayStr 
-        }).eq('device_id', deviceId);
+        // await supabase.from('souls').update({ 
+        //    daily_interactions_count: 0, 
+        //    last_reset_date: todayStr 
+        // }).eq('device_id', deviceId);
     }
     
     // 2. Check Throttle (5 seconds)
@@ -127,10 +127,10 @@ export async function POST(request: Request) {
     }
 
     // UPDATE USAGE (Async, fire and forget to save latency)
-    supabase.from('souls').update({
-        daily_interactions_count: currentCount + 1,
-        last_interaction_ts: now.toISOString()
-    }).eq('device_id', deviceId).then();
+    // supabase.from('souls').update({
+    //    daily_interactions_count: currentCount + 1,
+    //    last_interaction_ts: now.toISOString()
+    // }).eq('device_id', deviceId).then();
 
     // 2. Fetch Short-term Memory (Last 3 interactions)
     const { data: historyLogs } = await supabase

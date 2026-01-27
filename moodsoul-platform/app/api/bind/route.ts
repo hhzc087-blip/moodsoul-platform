@@ -38,8 +38,8 @@ export async function POST(request: Request) {
     
     const updates: any = {
         device_id: deviceId,
-        owner_name: ownerName,
-        is_bound: true,
+        // owner_name: ownerName, // Removed: Column missing in DB
+        // is_bound: true, // Removed: Column missing in DB
         // birth_date: new Date().toISOString(), // Removed: Column missing in DB
     };
 
