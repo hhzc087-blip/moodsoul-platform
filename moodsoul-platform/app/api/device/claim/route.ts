@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const envKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Fallback to ANON_KEY if SERVICE_ROLE_KEY is missing (handles user misconfiguration where Service Key is put in Anon var)
+const envKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 const isValidUrl = (url: string | undefined) => url && url.startsWith('http') && url !== 'your_supabase_url';
 
