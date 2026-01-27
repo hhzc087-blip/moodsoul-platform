@@ -28,14 +28,26 @@ export default function DashboardPage() {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [activeTab, setActiveTab] = useState<'PET' | 'MOOD' | 'APPS'>('PET');
   const [activePersonaId, setActivePersonaId] = useState<string | null>(null);
-  const [activeFeature, setActiveFeature] = useState<string>('NONE'); // Renamed from activeApp
+  const [activeFeature, setActiveFeature] = useState<string>('NONE');
   const [injecting, setInjecting] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const [user, setUser] = useState<any>(null);
 
-  // ... (Auth logic remains same)
+  // Initial fetch of personas
+  useEffect(() => {
+    const fetchPersonas = async () => {
+      const { data } = await supabase.from('personas').select('*');
+      if (data) setPersonas(data);
+    };
+    fetchPersonas();
+  }, []);
+
+  const showNotification = (msg: string) => {
+    setToastMessage(msg);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
 
   const fetchDeviceStatus = async (id: string) => {
     const { data } = await supabase
@@ -55,6 +67,14 @@ export default function DashboardPage() {
         setIsOnline(false);
       }
     }
+  };
+
+  const handleBind = async () => {
+    if (!deviceId) return;
+    setIsBinding(true);
+    await fetchDeviceStatus(deviceId);
+    setIsBinding(false);
+    showNotification("DEVICE LINKED");
   };
 
   const handleLaunchFeature = async (featureId: string) => {
@@ -87,7 +107,7 @@ export default function DashboardPage() {
     setInjecting(persona.id);
     const prevPersonaId = activePersonaId;
     setActivePersonaId(persona.id);
-    setActiveFeature('NONE'); // Reset feature when injecting soul
+    setActiveFeature('NONE'); 
     
     setTimeout(async () => {
       const { error } = await supabase
@@ -111,12 +131,65 @@ export default function DashboardPage() {
     }, 1500);
   };
   
-  // ... (rest of render logic, using activeFeature instead of activeApp)
+  const filteredPersonas = personas.filter(p => p.mode === activeTab);
 
   return (
     <div className="min-h-screen bg-black text-cyan-400 font-mono p-4 md:p-8 pb-24 selection:bg-cyan-900 selection:text-white max-w-7xl mx-auto transition-all duration-300 overflow-hidden">
       
-      {/* ... (Toast & Header remain same) ... */}
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {showToast && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-cyan-500 text-cyan-400 px-6 py-3 rounded-full shadow-[0_0_20px_rgba(6,182,212,0.5)] flex items-center gap-3"
+          >
+            <CheckCircle2 className="w-5 h-5 text-green-400" />
+            <span className="font-bold tracking-widest text-sm">{toastMessage}</span>
+            <div className="absolute bottom-0 left-0 h-1 bg-cyan-500 animate-[width_3s_linear_forwards]" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Header */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="border-b border-cyan-900/50 pb-6 mb-6 md:mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4"
+      >
+        <div>
+          <h1 className="text-2xl md:text-4xl font-black tracking-tighter italic bg-gradient-to-r from-cyan-400 to-purple-600 bg-clip-text text-transparent mb-2">
+            MOOD//SOUL
+          </h1>
+          <div className="flex items-center space-x-2 text-xs md:text-sm">
+            <Wifi className={`w-3 h-3 md:w-4 md:h-4 ${isOnline ? 'text-green-500' : 'text-red-500 animate-pulse'}`} />
+            <span className={isOnline ? 'text-green-500' : 'text-red-500'}>
+              {isOnline ? 'ONLINE' : 'DISCONNECTED'}
+            </span>
+          </div>
+        </div>
+
+        <div className="relative group w-full md:w-auto">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-600 to-purple-600 rounded-lg opacity-50 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 blur"></div>
+          <div className="relative flex bg-black rounded-lg p-1">
+            <input
+              type="text"
+              placeholder="ENTER DEVICE ID"
+              value={deviceId}
+              onChange={(e) => setDeviceId(e.target.value)}
+              className="w-full md:w-64 bg-black text-white px-3 py-2 text-sm md:text-base outline-none placeholder-cyan-900/50 uppercase tracking-widest"
+            />
+            <button 
+              onClick={handleBind}
+              disabled={isBinding}
+              className="bg-cyan-900/30 hover:bg-cyan-800 text-cyan-300 px-4 py-2 rounded text-xs md:text-sm font-bold uppercase transition-all border-l border-cyan-800 shrink-0"
+            >
+              {isBinding ? <Loader2 className="animate-spin w-3 h-3 md:w-4 md:h-4" /> : 'LINK'}
+            </button>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Mode Tabs */}
       <motion.div 
@@ -183,7 +256,6 @@ export default function DashboardPage() {
             })
           ) : (
             filteredPersonas.map((persona) => {
-              // ... existing persona map logic ...
               const isActive = activePersonaId === persona.id;
               const isInjecting = injecting === persona.id;
 
@@ -202,8 +274,10 @@ export default function DashboardPage() {
                       : 'border-cyan-900/30 bg-black hover:border-cyan-500/50 hover:shadow-[0_0_20px_-5px_rgba(34,211,238,0.2)]'
                   }`}
                 >
-                  {/* ... existing card content ... */}
+                  {/* Scanline Effect */}
                   <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.5)_50%)] bg-[length:100%_4px] pointer-events-none opacity-20"></div>
+                  
+                  {/* Injecting Overlay */}
                   <AnimatePresence>
                     {isInjecting && (
                       <motion.div 
@@ -217,6 +291,7 @@ export default function DashboardPage() {
                       </motion.div>
                     )}
                   </AnimatePresence>
+
                   <div className="flex items-start justify-between relative z-10">
                     <div>
                       <h3 className={`text-lg font-bold uppercase tracking-wider ${isActive ? 'text-green-400' : 'text-cyan-200'}`}>
@@ -230,6 +305,8 @@ export default function DashboardPage() {
                       {persona.mode === 'PET' ? <Cat size={20} /> : <Skull size={20} />}
                     </div>
                   </div>
+
+                  {/* Status Indicator */}
                   <div className="mt-4 flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-green-500 animate-ping' : 'bg-cyan-900'}`}></div>
@@ -243,222 +320,6 @@ export default function DashboardPage() {
               );
             })
           )}
-        </AnimatePresence>
-      </motion.div>
-      
-      {/* ... (Footer) ... */}
-    </div>
-  );
-}
-
-  const showNotification = (msg: string) => {
-    setToastMessage(msg);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
-  };
-
-  const handleInjectSoul = async (persona: Persona) => {
-    if (!deviceId) {
-      alert("BIND DEVICE FIRST!");
-      return;
-    }
-    
-    // Optimistic UI Update
-    setInjecting(persona.id);
-    const prevPersonaId = activePersonaId;
-    setActivePersonaId(persona.id);
-    setActiveApp('IDLE');
-    
-    setTimeout(async () => {
-      const { error } = await supabase
-        .from('souls')
-        .update({ 
-          active_persona_id: persona.id,
-          current_mode: persona.mode,
-          current_app: 'IDLE'
-        })
-        .eq('device_id', deviceId);
-
-      if (error) {
-        console.error("Injection failed", error);
-        setActivePersonaId(prevPersonaId);
-        alert("Injection Failed: " + error.message);
-      } else {
-        showNotification(`SOUL INJECTED: ${persona.name.toUpperCase()}`);
-      }
-      
-      setInjecting(null);
-    }, 1500);
-  };
-
-  const filteredPersonas = personas.filter(p => p.mode === activeTab);
-
-  return (
-    <div className="min-h-screen bg-black text-cyan-400 font-mono p-4 md:p-8 pb-24 selection:bg-cyan-900 selection:text-white max-w-7xl mx-auto transition-all duration-300 overflow-hidden">
-      
-      {/* Toast Notification */}
-      <AnimatePresence>
-        {showToast && (
-          <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-cyan-500 text-cyan-400 px-6 py-3 rounded-full shadow-[0_0_20px_rgba(6,182,212,0.5)] flex items-center gap-3"
-          >
-            <CheckCircle2 className="w-5 h-5 text-green-400" />
-            <span className="font-bold tracking-widest text-sm">{toastMessage}</span>
-            <div className="absolute bottom-0 left-0 h-1 bg-cyan-500 animate-[width_3s_linear_forwards]" />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Header */}
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="border-b border-cyan-900/50 pb-6 mb-6 md:mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4"
-      >
-        {/* ... (Header content same as before) ... */}
-        <div>
-          <h1 className="text-2xl md:text-4xl font-black tracking-tighter italic bg-gradient-to-r from-cyan-400 to-purple-600 bg-clip-text text-transparent mb-2">
-            MOOD//SOUL
-          </h1>
-          <div className="flex items-center space-x-2 text-xs md:text-sm">
-            <Wifi className={`w-3 h-3 md:w-4 md:h-4 ${isOnline ? 'text-green-500' : 'text-red-500 animate-pulse'}`} />
-            <span className={isOnline ? 'text-green-500' : 'text-red-500'}>
-              {isOnline ? 'ONLINE' : 'DISCONNECTED'}
-            </span>
-          </div>
-        </div>
-
-        <div className="relative group w-full md:w-auto">
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-600 to-purple-600 rounded-lg opacity-50 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 blur"></div>
-          <div className="relative flex bg-black rounded-lg p-1">
-            <input
-              type="text"
-              placeholder="ENTER DEVICE ID"
-              value={deviceId}
-              onChange={(e) => setDeviceId(e.target.value)}
-              className="w-full md:w-64 bg-black text-white px-3 py-2 text-sm md:text-base outline-none placeholder-cyan-900/50 uppercase tracking-widest"
-            />
-            <button 
-              onClick={handleBind}
-              disabled={isBinding}
-              className="bg-cyan-900/30 hover:bg-cyan-800 text-cyan-300 px-4 py-2 rounded text-xs md:text-sm font-bold uppercase transition-all border-l border-cyan-800 shrink-0"
-            >
-              {isBinding ? <Loader2 className="animate-spin w-3 h-3 md:w-4 md:h-4" /> : 'LINK'}
-            </button>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Mode Tabs */}
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="flex space-x-2 md:space-x-4 mb-6 md:mb-10"
-      >
-        <button
-          onClick={() => setActiveTab('PET')}
-          className={`flex-1 py-3 md:py-4 border-b-2 flex justify-center items-center gap-2 transition-all relative overflow-hidden ${
-            activeTab === 'PET' 
-              ? 'border-cyan-500 text-cyan-400' 
-              : 'border-cyan-900/30 text-cyan-900 hover:text-cyan-700'
-          }`}
-        >
-          {activeTab === 'PET' && (
-            <motion.div layoutId="activeTab" className="absolute inset-0 bg-cyan-500/10" />
-          )}
-          <Cat className="w-4 h-4 md:w-6 md:h-6 relative z-10" />
-          <span className="font-bold tracking-widest text-xs md:text-lg relative z-10">PET_MODE</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('MOOD')}
-          className={`flex-1 py-3 md:py-4 border-b-2 flex justify-center items-center gap-2 transition-all relative overflow-hidden ${
-            activeTab === 'MOOD' 
-              ? 'border-purple-500 text-purple-400' 
-              : 'border-purple-900/30 text-purple-900 hover:text-purple-700'
-          }`}
-        >
-          {activeTab === 'MOOD' && (
-            <motion.div layoutId="activeTab" className="absolute inset-0 bg-purple-500/10" />
-          )}
-          <Heart className="w-4 h-4 md:w-6 md:h-6 relative z-10" />
-          <span className="font-bold tracking-widest text-xs md:text-lg relative z-10">MOOD_MODE</span>
-        </button>
-      </motion.div>
-
-      {/* Persona Grid */}
-      <motion.div 
-        layout
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6"
-      >
-        <AnimatePresence mode="popLayout">
-          {filteredPersonas.map((persona) => {
-            const isActive = activePersonaId === persona.id;
-            const isInjecting = injecting === persona.id;
-
-            return (
-              <motion.div 
-                key={persona.id}
-                layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => handleInjectSoul(persona)}
-                className={`relative overflow-hidden rounded-xl border-2 p-4 cursor-pointer transition-colors duration-300 group ${
-                  isActive 
-                    ? 'border-green-500 bg-green-900/10 shadow-[0_0_30px_-5px_rgba(34,197,94,0.3)]' 
-                    : 'border-cyan-900/30 bg-black hover:border-cyan-500/50 hover:shadow-[0_0_20px_-5px_rgba(34,211,238,0.2)]'
-                }`}
-              >
-                {/* Scanline Effect */}
-                <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.5)_50%)] bg-[length:100%_4px] pointer-events-none opacity-20"></div>
-                
-                {/* Injecting Overlay */}
-                <AnimatePresence>
-                  {isInjecting && (
-                    <motion.div 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute inset-0 bg-black/80 z-20 flex flex-col items-center justify-center backdrop-blur-sm"
-                    >
-                      <Zap className="w-12 h-12 text-yellow-400 animate-bounce" />
-                      <span className="text-yellow-400 font-bold animate-pulse mt-2 tracking-widest">INJECTING...</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <div className="flex items-start justify-between relative z-10">
-                  <div>
-                    <h3 className={`text-lg font-bold uppercase tracking-wider ${isActive ? 'text-green-400' : 'text-cyan-200'}`}>
-                      {persona.name}
-                    </h3>
-                    <p className="text-xs text-cyan-600/80 mt-1 max-w-[80%] leading-relaxed line-clamp-2">
-                      {persona.description}
-                    </p>
-                  </div>
-                  <div className={`p-2 rounded-lg ${isActive ? 'bg-green-500/20 text-green-400' : 'bg-cyan-900/20 text-cyan-700'}`}>
-                    {persona.mode === 'PET' ? <Cat size={20} /> : <Skull size={20} />}
-                  </div>
-                </div>
-
-                {/* Status Indicator */}
-                <div className="mt-4 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-green-500 animate-ping' : 'bg-cyan-900'}`}></div>
-                    <span className={`text-[10px] uppercase tracking-widest ${isActive ? 'text-green-500' : 'text-cyan-900'}`}>
-                      {isActive ? 'ACTIVE LINK' : 'STANDBY'}
-                    </span>
-                  </div>
-                  {isActive && <Battery className="w-4 h-4 text-green-500" />}
-                </div>
-              </motion.div>
-            );
-          })}
         </AnimatePresence>
       </motion.div>
 

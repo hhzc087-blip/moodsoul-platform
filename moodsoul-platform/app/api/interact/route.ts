@@ -315,30 +315,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // -----------------------------------------------------
-    // 4. PROACTIVE VISION (Auto Observe)
-    // -----------------------------------------------------
-    else if (trigger === 'AUTO_OBSERVE') {
-        systemPrompt = `You noticed a change in the environment or the user just sat down.
-        
-        HISTORY OF CONVERSATION:
-        ${historyContext}
-        
-        CURRENT TASK:
-        Analyze the image. Look for anything NEW or INTERESTING (food, messy desk, tired face, new object).
-        
-        CRITICAL INSTRUCTION:
-        If nothing interesting is happening or the user looks busy/normal, reply with exactly "IGNORE".
-        If you see something worth commenting on (e.g., "Is that a third coffee?", "Nice cat", "Clean your desk"), generate a short, witty comment (roast or comfort) based on your persona:
-        - Toxicity: ${persona?.toxicity_level || 50}/100
-        - Chaos: ${persona?.chaos_level || 50}/100
-        
-        Output JSON format:
-        {
-          "user_context": "What you saw (or 'Nothing')",
-          "response": "Your comment OR 'IGNORE'"
-        }`;
-    }
+
     
     // -----------------------------------------------------
     // GLOBAL EVENTS CHECK (God Mode Override)

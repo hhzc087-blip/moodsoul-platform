@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { motion } from 'framer-motion';
-import { Sparkles, Save, Upload, Dna, Zap, Flame, Smile } from 'lucide-react';
+import { Sparkles, Save, Upload, Dna, Zap, Flame, Smile, User } from 'lucide-react';
 
 const ZODIAC_SIGNS = [
   "Aries ♈️", "Taurus ♉️", "Gemini ♊️", "Cancer ♋️", 

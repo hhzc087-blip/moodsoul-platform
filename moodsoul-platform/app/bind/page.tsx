@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { QrCode, Link, CheckCircle, Smartphone } from 'lucide-react';
 
-export default function BindingPage() {
+function BindingContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const deviceId = searchParams.get('deviceId');
@@ -104,7 +104,7 @@ export default function BindingPage() {
                             <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Email (Optional)</label>
                             <input 
                                 className="w-full bg-black border border-slate-700 rounded-xl p-4 text-white focus:border-blue-500 outline-none transition-all"
-                                placeholder="For your backup key"
+                                placeholder="For recovery"
                                 value={email} onChange={e => setEmail(e.target.value)}
                             />
                         </div>
@@ -112,32 +112,41 @@ export default function BindingPage() {
 
                     <button 
                         onClick={handleBind}
-                        className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white shadow-lg shadow-blue-900/20 transition-all active:scale-95"
+                        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-blue-900/20"
                     >
-                        CONFIRM BINDING
+                        COMPLETE BINDING
                     </button>
                 </motion.div>
             )}
 
-            {/* 3. LOADING / SUCCESS */}
-            {(status === 'BINDING' || status === 'SUCCESS') && (
-                <motion.div className="text-center">
-                    {status === 'BINDING' ? (
-                        <div className="animate-pulse">
-                            <div className="w-20 h-20 mx-auto border-t-4 border-blue-500 rounded-full animate-spin mb-6" />
-                            <h2 className="text-xl font-bold">Injecting Owner Data...</h2>
-                        </div>
-                    ) : (
-                        <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }}>
-                            <CheckCircle size={80} className="text-green-500 mx-auto mb-6" />
-                            <h2 className="text-3xl font-black italic text-green-400">SUCCESS!</h2>
-                            <p className="text-slate-500 mt-2">Redirecting to Dashboard...</p>
-                        </motion.div>
-                    )}
-                </motion.div>
+            {/* 3. BINDING LOADING */}
+            {status === 'BINDING' && (
+                <div className="text-center">
+                    <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
+                    <p className="text-slate-400 font-mono text-xs uppercase tracking-widest">Registering Soul...</p>
+                </div>
             )}
 
+            {/* 4. SUCCESS */}
+            {status === 'SUCCESS' && (
+                <motion.div 
+                    initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                    className="text-center"
+                >
+                    <CheckCircle size={80} className="text-green-500 mx-auto mb-6" />
+                    <h1 className="text-3xl font-black italic mb-2">ALL SET!</h1>
+                    <p className="text-slate-500">Redirecting to Dashboard...</p>
+                </motion.div>
+            )}
         </div>
     </div>
+  );
+}
+
+export default function BindingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>}>
+      <BindingContent />
+    </Suspense>
   );
 }
