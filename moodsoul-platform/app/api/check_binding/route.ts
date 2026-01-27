@@ -22,9 +22,10 @@ export async function GET(request: Request) {
 
   const { data } = await supabase
     .from('souls')
-    .select('is_bound')
+    .select('id') // Just check existence
     .eq('device_id', deviceId)
     .single();
 
-  return NextResponse.json({ bound: data?.is_bound || false });
+  // If record exists, we consider it "bound" for now (Auto-onboarding to bypass schema issues)
+  return NextResponse.json({ bound: !!data });
 }
