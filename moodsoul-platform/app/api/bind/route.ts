@@ -68,11 +68,11 @@ export async function POST(request: Request) {
         // NOTE: This assumes owner_id is NOT a Foreign Key to auth.users. 
         // If it is, this might fail or we should leave it null.
         // Given 'interact' checks for owner_id, we try to set it.
-        updates.owner_id = crypto.randomUUID(); 
+        // updates.owner_id = crypto.randomUUID(); // Removed: Avoid FK violation if owner_id references auth.users
     } else {
         // If existing but no owner_id, set one?
         if (!existing.owner_id) {
-             updates.owner_id = crypto.randomUUID();
+             // updates.owner_id = crypto.randomUUID(); // Removed
         }
     }
     

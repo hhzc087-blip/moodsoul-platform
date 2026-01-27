@@ -44,7 +44,10 @@ export async function POST(request: NextRequest) {
         // Not bound. Update token if it changed (e.g., factory reset)
         await supabase
           .from('souls')
-          .update({ pairing_token: token, last_seen_at: new Date().toISOString() })
+          .update({ 
+            pairing_token: token, 
+            // last_seen_at: new Date().toISOString() // Removed
+          })
           .eq('device_id', deviceId);
       }
     } else {
@@ -66,7 +69,7 @@ export async function POST(request: NextRequest) {
           // archetype: 'Default Soul', // Removed
           active_persona_id: defaultPersona?.id,
           voice_id: 'default',
-          last_seen_at: new Date().toISOString()
+          // last_seen_at: new Date().toISOString() // Removed: Avoid error if column missing
         });
       
       if (insertError) {
