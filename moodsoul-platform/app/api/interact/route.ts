@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import axios from 'axios';
 import { Soul } from '@/types/soul';
+
+// Initialize Supabase Admin Client
+const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const envKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const isValidUrl = (url: string | undefined) => url && url.startsWith('http') && url !== 'your_supabase_url';
+
+const supabaseUrl = isValidUrl(envUrl) ? envUrl! : 'https://placeholder-project.supabase.co';
+const supabaseServiceKey = (envKey && envKey !== 'your_supabase_service_key') ? envKey : 'placeholder-key'; 
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
