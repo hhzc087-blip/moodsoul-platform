@@ -40,7 +40,7 @@ export async function POST(request: Request) {
         device_id: deviceId,
         owner_name: ownerName,
         is_bound: true,
-        birth_date: new Date().toISOString(),
+        // birth_date: new Date().toISOString(), // Removed: Column missing in DB
     };
 
     // If it's a new record (not found in DB), add default fields
