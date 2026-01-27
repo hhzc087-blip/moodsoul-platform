@@ -3,8 +3,14 @@ import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase Admin Client (Service Role for upserting without RLS restrictions initially)
 // NOTE: In a real production app, ensure this key is secure.
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!; 
+const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const envKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const isValidUrl = (url: string | undefined) => url && url.startsWith('http') && url !== 'your_supabase_url';
+
+const supabaseUrl = isValidUrl(envUrl) ? envUrl! : 'https://placeholder-project.supabase.co';
+const supabaseServiceKey = (envKey && envKey !== 'your_supabase_service_key') ? envKey : 'placeholder-key'; 
+
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function POST(request: NextRequest) {

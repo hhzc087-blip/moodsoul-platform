@@ -139,7 +139,7 @@ export default function MobileApp() {
 
   const downloadCert = async () => {
       if(certRef.current) {
-          const canvas = await html2canvas(certRef.current, { backgroundColor: null });
+          const canvas = await html2canvas(certRef.current, { backgroundColor: null } as any);
           const link = document.createElement('a');
           link.download = 'soul-certificate.png';
           link.href = canvas.toDataURL();
