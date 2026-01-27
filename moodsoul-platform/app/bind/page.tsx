@@ -38,7 +38,8 @@ function BindingContent() {
             router.push('/dashboard');
         }, 2000);
       } else {
-        alert("Binding failed. Please try again.");
+        const data = await res.json();
+        alert(`Binding failed: ${data.error || "Unknown error"}`);
         setStatus('FORM');
       }
     } catch (e) {

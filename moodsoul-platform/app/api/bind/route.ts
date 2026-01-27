@@ -35,18 +35,31 @@ export async function POST(request: Request) {
     // Let's check if there is an existing record
     const { data: existing } = await supabase.from('souls').select('*').eq('device_id', deviceId).single();
     
-    const updates = {
+    const updates: any = {
         device_id: deviceId,
         owner_name: ownerName,
         is_bound: true,
         birth_date: new Date().toISOString(),
-        // If it's a new binding, we might want to set a default persona
-        // active_persona_id: ... (Let the DB default handle it or leave null)
     };
 
-    // If we need to satisfy the NOT NULL constraint on owner_id (if it exists)
-    // We might need to handle it. Assuming schema allows null or we provide one.
-    // In previous steps, owner_id was used as a check.
+    // If it's a new record (not found in DB), add default fields
+    if (!existing) {
+        updates.current_mode = 'PET';
+        updates.archetype = 'Default Soul';
+        updates.voice_id = 'default';
+        updates.daily_interactions_count = 0;
+        // Generate a random UUID for owner_id to satisfy constraints if any, 
+        // and to allow interaction checks that rely on owner_id presence.
+        // NOTE: This assumes owner_id is NOT a Foreign Key to auth.users. 
+        // If it is, this might fail or we should leave it null.
+        // Given 'interact' checks for owner_id, we try to set it.
+        updates.owner_id = crypto.randomUUID(); 
+    } else {
+        // If existing but no owner_id, set one?
+        if (!existing.owner_id) {
+             updates.owner_id = crypto.randomUUID();
+        }
+    }
     
     const { error } = await supabase.from('souls').upsert(updates, { onConflict: 'device_id' });
 

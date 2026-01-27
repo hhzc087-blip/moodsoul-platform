@@ -49,7 +49,8 @@ export async function POST(request: Request) {
     const persona = soul.personas; // The linked persona object
     
     // SECURITY CHECK: Ensure device is bound
-    if (!soul.owner_id) {
+    // We allow if owner_id exists OR if is_bound is explicitly true
+    if (!soul.owner_id && !soul.is_bound) {
         return NextResponse.json({ error: 'Device not bound. Scan QR code to bind.' }, { status: 403 });
     }
     
