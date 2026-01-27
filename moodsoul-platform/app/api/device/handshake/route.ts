@@ -48,6 +48,14 @@ export async function POST(request: NextRequest) {
           .eq('device_id', deviceId);
       }
     } else {
+      // Fetch default persona
+      const { data: defaultPersona } = await supabase
+        .from('personas')
+        .select('id')
+        .eq('mode', 'PET')
+        .limit(1)
+        .single();
+
       // New Device. Create record.
       const { error: insertError } = await supabase
         .from('souls')
@@ -55,7 +63,8 @@ export async function POST(request: NextRequest) {
           device_id: deviceId,
           pairing_token: token,
           current_mode: 'PET',
-          archetype: 'Default Soul',
+          // archetype: 'Default Soul', // Removed
+          active_persona_id: defaultPersona?.id,
           voice_id: 'default',
           last_seen_at: new Date().toISOString()
         });

@@ -46,10 +46,24 @@ export async function POST(request: Request) {
     // If it's a new record (not found in DB), add default fields
     if (!existing) {
         updates.current_mode = 'PET';
-        updates.archetype = 'Default Soul';
+        // updates.archetype = 'Default Soul'; // Removed: Column dropped from DB
+        
+        // Fetch default persona (Toxic Cat or first available)
+        const { data: defaultPersona } = await supabase
+            .from('personas')
+            .select('id')
+            .eq('mode', 'PET')
+            .limit(1)
+            .single();
+            
+        if (defaultPersona) {
+            updates.active_persona_id = defaultPersona.id;
+        }
+
         updates.voice_id = 'default';
-        updates.daily_interactions_count = 0;
-        // Generate a random UUID for owner_id to satisfy constraints if any, 
+        // updates.daily_interactions_count = 0; // Removed: Might be missing in some DB versions, safe to skip (default is 0 in DB)
+        
+        // Generate a random UUID for owner_id to satisfy constraints if any,  
         // and to allow interaction checks that rely on owner_id presence.
         // NOTE: This assumes owner_id is NOT a Foreign Key to auth.users. 
         // If it is, this might fail or we should leave it null.
