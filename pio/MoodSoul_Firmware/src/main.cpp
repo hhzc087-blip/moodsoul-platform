@@ -1,149 +1,179 @@
 #include <M5CoreS3.h>
 #include <WiFi.h>
-#include <WiFiManager.h>
+#include <WiFiManager.h> // You need to install this library
 #include <esp_camera.h>
 #include <HTTPClient.h>
 #include <Update.h>
 #include <Preferences.h>
 
-const char* SERVER_HOST = "moodsoul-platform.vercel.app";
-const int SERVER_PORT = 443;
-const char* SERVER_PATH = "/api/interact";
-const char* UPDATE_URL = "https://moodsoul-platform.vercel.app/api/firmware";
-String DEVICE_ID = "";
-const char* CURRENT_VERSION = "1.1";
+// ==========================================
+// CONFIGURATION
+// ==========================================
+const char* SERVER_HOST   = "moodsoul-platform-gb2h.vercel.app"; // Updated to your deployed project URL
+const int   SERVER_PORT   = 443; // HTTPS
+const char* SERVER_PATH   = "/api/interact";
+const char* UPDATE_URL    = "https://moodsoul-platform-gb2h.vercel.app/api/firmware"; 
+String      DEVICE_ID     = ""; // Will be set from MAC
+const char* CURRENT_VERSION = "1.1"; 
 
+// Audio Settings
 #define RECORD_TIME_SEC 3
-#define SAMPLE_RATE 16000
-#define AUDIO_BUF_SIZE (RECORD_TIME_SEC * SAMPLE_RATE * 2)
+#define SAMPLE_RATE     16000
+#define AUDIO_BUF_SIZE  (RECORD_TIME_SEC * SAMPLE_RATE * 2) // 16-bit PCM
 uint8_t* audioBuffer = nullptr;
 
 const char* BINDING_CHECK_PATH = "/api/check_binding";
 Preferences preferences;
 
 void drawIcon(const char* label, uint16_t color, const char* iconType);
-void showHotspotQR();
-void showBindQR();
 
+// ==========================================
+// DEVICE HANDSHAKE (BINDING)
+// ==========================================
 void checkBinding() {
     preferences.begin("moodsoul", false);
     bool isBound = preferences.getBool("is_bound", false);
+    
     if (isBound) {
         drawIcon("Welcome Back", BLUE, "none");
         delay(1000);
         preferences.end();
         return;
     }
+
+    // Not bound: Start Binding Flow
     DEVICE_ID = WiFi.macAddress();
-    DEVICE_ID.replace(":", "");
+    DEVICE_ID.replace(":", ""); // Clean MAC for ID
+    
     String bindUrl = "https://" + String(SERVER_HOST) + "/bind?deviceId=" + DEVICE_ID;
-    showBindQR();
+    
+    M5.Lcd.fillScreen(BLACK);
+    
+    // Resize QR to fit: 180px box, centered horizontally (320w), top margin 10
+    // x = (320-180)/2 = 70
+    M5.Lcd.qrcode(bindUrl, 70, 10, 180, 6);
+    
+    // Make ID readable
+    M5.Lcd.setTextDatum(MC_DATUM); // Middle Center
+    M5.Lcd.setTextColor(ORANGE);
+    M5.Lcd.setTextSize(2); // Bigger text
+    M5.Lcd.drawString("ID:", 160, 205);
+    M5.Lcd.setTextColor(WHITE);
+    M5.Lcd.drawString(DEVICE_ID, 160, 225); // Display ID clearly at bottom
+    
     HTTPClient http;
+    // Loop until bound
     while (!isBound) {
+        // Poll API every 2 seconds
+        // Note: Ensure your backend has this endpoint implementing the check logic
         String apiPath = String("https://") + SERVER_HOST + BINDING_CHECK_PATH + "?deviceId=" + DEVICE_ID;
         http.begin(apiPath);
         int code = http.GET();
+        
         if (code == 200) {
             String res = http.getString();
             if (res.indexOf("\"bound\":true") >= 0) {
                 isBound = true;
                 preferences.putBool("is_bound", true);
-                M5.Speaker.tone(1000, 200);
+                
+                M5.Speaker.tone(1000, 200); // Success Beep
                 delay(200);
                 M5.Speaker.tone(2000, 400);
+                
                 M5.Lcd.fillScreen(BLACK);
                 drawIcon("SOUL LINKED!", GREEN, "none");
                 delay(2000);
             }
         }
         http.end();
+        
         delay(2000);
         M5.update();
     }
     preferences.end();
 }
 
+// ==========================================
+// UI HELPERS
+// ==========================================
 void drawIcon(const char* label, uint16_t color, const char* iconType) {
     M5.Lcd.fillScreen(BLACK);
     M5.Lcd.setTextColor(color);
     M5.Lcd.setTextSize(2);
     M5.Lcd.setTextDatum(MC_DATUM);
     M5.Lcd.drawString(label, M5.Lcd.width() / 2, M5.Lcd.height() - 40);
+
     int cx = M5.Lcd.width() / 2;
     int cy = M5.Lcd.height() / 2 - 20;
+
     if (strcmp(iconType, "ear") == 0) {
+        // Simple Ear
         M5.Lcd.fillCircle(cx, cy, 40, color);
         M5.Lcd.fillCircle(cx, cy, 30, BLACK);
         M5.Lcd.fillCircle(cx - 10, cy, 10, color);
     } else if (strcmp(iconType, "load") == 0) {
+        // Loading dots
         M5.Lcd.fillCircle(cx - 30, cy, 10, color);
         M5.Lcd.fillCircle(cx, cy, 10, color);
         M5.Lcd.fillCircle(cx + 30, cy, 10, color);
     } else if (strcmp(iconType, "mouth") == 0) {
-        M5.Lcd.fillEllipse(cx, cy, 50, 10, color);
+        // Simple Mouth (Base state for Lip Sync)
+        M5.Lcd.fillEllipse(cx, cy, 50, 10, color); // Start closed
     } else if (strcmp(iconType, "dizzy") == 0) {
+        // Spiral Eyes (Simplified as concentric circles)
         M5.Lcd.drawCircle(cx - 30, cy, 20, color);
         M5.Lcd.drawCircle(cx - 30, cy, 10, color);
         M5.Lcd.drawCircle(cx + 30, cy, 20, color);
         M5.Lcd.drawCircle(cx + 30, cy, 10, color);
-        M5.Lcd.fillRect(cx - 20, cy + 30, 40, 5, color);
+        M5.Lcd.fillRect(cx - 20, cy + 30, 40, 5, color); // Straight mouth
     } else if (strcmp(iconType, "tired") == 0) {
-        M5.Lcd.drawLine(cx - 50, cy - 10, cx - 10, cy, color);
+        // Low Battery Face
+        M5.Lcd.drawLine(cx - 50, cy - 10, cx - 10, cy, color); // Droopy eyes
         M5.Lcd.drawLine(cx + 10, cy, cx + 50, cy - 10, color);
-        M5.Lcd.drawArc(cx, cy + 30, 20, 20, 180, 360, color);
+        M5.Lcd.drawArc(cx, cy + 30, 20, 20, 180, 360, color); // Frown
     }
 }
 
-void showHotspotQR() {
-    M5.Lcd.fillScreen(BLACK);
-    M5.Lcd.setTextColor(YELLOW);
-    M5.Lcd.setTextSize(2);
-    M5.Lcd.setTextDatum(TC_DATUM);
-    M5.Lcd.drawString("Join Hotspot", M5.Lcd.width() / 2, 5);
-    M5.Lcd.qrcode("WIFI:S:MoodSoul_Setup;T:nopass;;", 50, 30, 220, 6);
-    M5.Lcd.setTextColor(WHITE);
-    M5.Lcd.setTextSize(1);
-    M5.Lcd.setTextDatum(BC_DATUM);
-    M5.Lcd.drawString("Open AP: MoodSoul_Setup (no password)", M5.Lcd.width() / 2, M5.Lcd.height() - 5);
-}
-
-void showBindQR() {
-    String bindUrl = "https://" + String(SERVER_HOST) + "/bind?deviceId=" + DEVICE_ID;
-    M5.Lcd.fillScreen(BLACK);
-    M5.Lcd.setTextColor(CYAN);
-    M5.Lcd.setTextSize(2);
-    M5.Lcd.setTextDatum(TC_DATUM);
-    M5.Lcd.drawString("Bind Account", M5.Lcd.width() / 2, 5);
-    M5.Lcd.qrcode(bindUrl.c_str(), 50, 30, 220, 6);
-    M5.Lcd.setTextColor(WHITE);
-    M5.Lcd.setTextSize(1);
-    M5.Lcd.setTextDatum(BC_DATUM);
-    M5.Lcd.drawString("Scan to open H5 and complete binding", M5.Lcd.width() / 2, M5.Lcd.height() - 5);
-}
-
+// ==========================================
+// LIP SYNC HELPER
+// ==========================================
 void drawMouth(int volume) {
+    // Map volume (0-255 approx) to mouth height (5-60)
     int height = map(constrain(volume, 0, 100), 0, 100, 5, 60);
     int cx = M5.Lcd.width() / 2;
     int cy = M5.Lcd.height() / 2 - 20;
+    
+    // Clear previous mouth area
     M5.Lcd.fillRect(cx - 60, cy - 60, 120, 120, BLACK);
+    
+    // Draw new mouth
     M5.Lcd.fillEllipse(cx, cy, 50, height, GREEN);
-    M5.Lcd.fillEllipse(cx, cy, 30, height / 2, BLACK);
+    M5.Lcd.fillEllipse(cx, cy, 30, height/2, BLACK); // Inner mouth
 }
 
+// ==========================================
+// OTA UPDATE CHECK
+// ==========================================
 void checkUpdate() {
     drawIcon("Check Update", YELLOW, "load");
+    
     HTTPClient http;
+    // Append current version to query
     String url = String(UPDATE_URL) + "?current_version=" + String(CURRENT_VERSION);
     http.begin(url);
+    
     int httpCode = http.GET();
+    
     if (httpCode == 200) {
         int contentLength = http.getSize();
         if (contentLength > 0) {
             drawIcon("UPDATING...", MAGENTA, "load");
+            
             bool canBegin = Update.begin(contentLength);
             if (canBegin) {
-                WiFiClient* stream = http.getStreamPtr();
+                WiFiClient *stream = http.getStreamPtr();
                 size_t written = Update.writeStream(*stream);
+                
                 if (written == contentLength) {
                     if (Update.end()) {
                         if (Update.isFinished()) {
@@ -151,61 +181,81 @@ void checkUpdate() {
                             delay(1000);
                             ESP.restart();
                         } else {
-                            drawIcon("Upd Error", RED, "none");
+                             drawIcon("Upd Error", RED, "none");
                         }
                     } else {
-                        drawIcon("Upd Fail", RED, "none");
+                         drawIcon("Upd Fail", RED, "none");
                     }
                 } else {
-                    drawIcon("Wrt Fail", RED, "none");
+                     drawIcon("Wrt Fail", RED, "none");
                 }
             }
         }
     } else if (httpCode == 304) {
+        // Up to date
         drawIcon("Up to Date", GREEN, "none");
         delay(1000);
     } else {
         drawIcon("Check Fail", RED, "none");
         delay(1000);
     }
+    
     http.end();
 }
 
+// ==========================================
+// NETWORK TASK
+// ==========================================
 void sendInteraction(camera_fb_t* fb, uint8_t* audioData, size_t audioLen, const char* trigger = "") {
     WiFiClient client;
+    
     if (!client.connect(SERVER_HOST, SERVER_PORT)) {
         drawIcon("Conn Fail", RED, "none");
         delay(2000);
         return;
     }
+
     String boundary = "------------------------" + String(millis());
+    
+    // Prepare Headers (same as before)
+    // ... (Headers omitted for brevity, keeping existing logic)
     String head = "--" + boundary + "\r\n";
     head += "Content-Disposition: form-data; name=\"deviceId\"\r\n\r\n";
     head += String(DEVICE_ID) + "\r\n";
+    
     if (strlen(trigger) > 0) {
         head += "--" + boundary + "\r\n";
         head += "Content-Disposition: form-data; name=\"trigger\"\r\n\r\n";
         head += String(trigger) + "\r\n";
     }
+    
     if (fb) {
         head += "--" + boundary + "\r\n";
         head += "Content-Disposition: form-data; name=\"image\"; filename=\"capture.jpg\"\r\n";
         head += "Content-Type: image/jpeg\r\n\r\n";
     }
+    
     String mid = "";
     if (fb) mid = "\r\n--" + boundary + "\r\n";
     else mid = "--" + boundary + "\r\n";
+    
     mid += "Content-Disposition: form-data; name=\"audio\"; filename=\"audio.pcm\"\r\n";
     mid += "Content-Type: application/octet-stream\r\n\r\n";
+    
     String tail = "\r\n--" + boundary + "--\r\n";
+    
     size_t fbLen = fb ? fb->len : 0;
     size_t totalLen = head.length() + fbLen + mid.length() + audioLen + tail.length();
+
+    // Send Request
     client.println("POST " + String(SERVER_PATH) + " HTTP/1.1");
     client.println("Host: " + String(SERVER_HOST));
     client.println("Content-Length: " + String(totalLen));
     client.println("Content-Type: multipart/form-data; boundary=" + boundary);
-    client.println();
+    client.println(); 
+
     client.print(head);
+    
     if (fb) {
         uint8_t* fbBuf = fb->buf;
         size_t chunkSize = 1024;
@@ -216,7 +266,9 @@ void sendInteraction(camera_fb_t* fb, uint8_t* audioData, size_t audioLen, const
             fbLen -= toWrite;
         }
     }
+
     client.print(mid);
+
     uint8_t* audBuf = audioData;
     size_t audLen = audioLen;
     size_t chunkSize = 1024;
@@ -226,33 +278,59 @@ void sendInteraction(camera_fb_t* fb, uint8_t* audioData, size_t audioLen, const
         audBuf += toWrite;
         audLen -= toWrite;
     }
+
     client.print(tail);
+
+    // ==========================================
+    // LATENCY MASKING
+    // ==========================================
+    // Play "Thinking" sound from SD Card immediately after sending
+    // M5.Speaker.tone(400, 100); // Simple beep fallback
+    // Ideally: playWav("/sounds/hmm.wav"); 
+    
+    // ==========================================
+    // RECEIVE RESPONSE (Audio Stream)
+    // ==========================================
     unsigned long timeout = millis();
     while (client.connected()) {
         String line = client.readStringUntil('\n');
-        if (line == "\r") break;
-        if (millis() - timeout > 8000) {
+        if (line == "\r") break; 
+        if (millis() - timeout > 8000) { // Increased timeout for GenAI
             drawIcon("Timeout", RED, "none");
             client.stop();
             return;
         }
     }
+
+    // Lip Sync Loop
     drawIcon("Speaking...", GREEN, "mouth");
     M5.Speaker.begin();
     M5.Speaker.setVolume(128);
+
     uint8_t playBuf[1024];
     while (client.connected() && client.available()) {
         int bytesRead = client.read(playBuf, sizeof(playBuf));
         if (bytesRead > 0) {
+            // Calculate approx volume for Lip Sync
             long sum = 0;
-            for (int i = 0; i < bytesRead; i++) sum += abs((int8_t)playBuf[i]);
+            for(int i=0; i<bytesRead; i++) sum += abs((int8_t)playBuf[i]); // Simple PCM avg
             int avgVol = sum / bytesRead;
-            drawMouth(avgVol * 2);
+            
+            drawMouth(avgVol * 2); // Animate Mouth
+            
+            // Play Audio (Placeholder for actual PCM write)
+            // M5.Speaker.playRaw(playBuf, bytesRead, SAMPLE_RATE); 
+            // Note: playRaw might block, so we might need a buffer or separate task for smooth animation
+            // For MVP, we just animate based on read chunks
         }
     }
+
     client.stop();
 }
 
+// ==========================================
+// FACTORY TEST MODE
+// ==========================================
 void runFactoryTest() {
     M5.Lcd.fillScreen(BLACK);
     M5.Lcd.setTextColor(WHITE);
@@ -260,6 +338,8 @@ void runFactoryTest() {
     M5.Lcd.setCursor(10, 10);
     M5.Lcd.println("FACTORY TEST MODE");
     delay(1000);
+
+    // 1. RGB Screen Test
     M5.Lcd.fillScreen(RED);
     delay(500);
     M5.Lcd.fillScreen(GREEN);
@@ -267,22 +347,31 @@ void runFactoryTest() {
     M5.Lcd.fillScreen(BLUE);
     delay(500);
     M5.Lcd.fillScreen(BLACK);
+    
+    // 2. Audio Loopback
     M5.Lcd.setCursor(10, 50);
     M5.Lcd.println("Audio Loopback...");
     M5.Mic.record(audioBuffer, AUDIO_BUF_SIZE, SAMPLE_RATE);
     while (M5.Mic.isRecording()) delay(10);
     M5.Speaker.begin();
     M5.Speaker.setVolume(128);
-    M5.Speaker.tone(1000, 500);
+    // Note: M5CoreS3 speaker playback needs raw data handling or wav
+    // For simple test, we just beep if recording finished
+    M5.Speaker.tone(1000, 500); 
+
+    // 3. Camera Test
     M5.Lcd.setCursor(10, 90);
     M5.Lcd.println("Camera Preview...");
     if (CoreS3.Camera.get()) {
-        M5.Lcd.pushImage(0, 0, 320, 240, (uint16_t*)CoreS3.Camera.fb->buf);
+        // Draw frame to screen (Simplified, normally needs scaling)
+        M5.Lcd.pushImage(0, 0, 320, 240, (uint16_t*)CoreS3.Camera.fb->buf); 
         CoreS3.Camera.free();
-        delay(2000);
+        delay(2000); // Show for 2 sec
     } else {
         M5.Lcd.println("CAM FAIL");
     }
+
+    // 4. WiFi Scan
     M5.Lcd.fillScreen(BLACK);
     M5.Lcd.setCursor(10, 10);
     M5.Lcd.println("WiFi Scan...");
@@ -291,11 +380,14 @@ void runFactoryTest() {
     int n = WiFi.scanNetworks();
     M5.Lcd.printf("Found: %d\n", n);
     delay(2000);
+
+    // RESULT
     M5.Lcd.fillScreen(GREEN);
     M5.Lcd.setTextColor(BLACK);
     M5.Lcd.setTextSize(4);
     M5.Lcd.drawCenterString("PASS", 160, 100, 1);
-    while (1);
+    
+    while(1); // Stop here
 }
 
 void setup() {
@@ -303,6 +395,8 @@ void setup() {
     auto cfg = M5.config();
     CoreS3.begin(cfg);
     CoreS3.Camera.begin();
+    
+    // FACTORY TEST TRIGGER: Hold Screen on Boot
     if (M5.Touch.getCount() > 0) {
         unsigned long startHold = millis();
         while (M5.Touch.getCount() > 0) {
@@ -313,99 +407,155 @@ void setup() {
             M5.update();
         }
     }
+    
+    // Init IMU & Mic
+    M5.Imu.begin();
     M5.Mic.begin();
+
+    // Allocate Audio Buffer
     audioBuffer = (uint8_t*)heap_caps_malloc(AUDIO_BUF_SIZE, MALLOC_CAP_SPIRAM);
     if (!audioBuffer) {
         drawIcon("Mem Fail", RED, "none");
-        while (1);
+        while(1);
     }
-    showHotspotQR();
+
+    // ------------------------------------------
+    // 1. WiFi Provisioning (WiFiManager)
+    // ------------------------------------------
+    drawIcon("Setup WiFi", YELLOW, "load");
+    // Resize QR: 160px box, centered, top margin 20
+    // x = (320-160)/2 = 80
+    M5.Lcd.qrcode("WIFI:S:MoodSoul_Setup;T:nopass;;", 80, 20, 160, 6);
+    
+    M5.Lcd.setTextDatum(MC_DATUM);
+    M5.Lcd.setTextSize(2);
+    M5.Lcd.setTextColor(CYAN);
+    M5.Lcd.drawString("Scan to Setup WiFi", 160, 200);
+    
     WiFiManager wm;
-    bool res = wm.autoConnect("MoodSoul_Setup");
-    if (!res) {
+    bool res = wm.autoConnect("MoodSoul_Setup"); 
+    if(!res) {
         drawIcon("WiFi Fail", RED, "none");
-    } else {
+        // ESP.restart();
+    } 
+    else {
         drawIcon("Connected!", GREEN, "none");
         delay(1000);
     }
+    
+    // Check for Updates on Boot
     checkUpdate();
+    
+    // Check Binding Status
     checkBinding();
+
     drawIcon("Touch Me", BLUE, "none");
 }
 
 void loop() {
     M5.update();
+
+    // ------------------------------------------
+    // 4. Low Battery Logic
+    // ------------------------------------------
     int battery = M5.Power.getBatteryLevel();
     if (battery < 20) {
         drawIcon("LOW BATT", RED, "tired");
-        delay(5000);
-        return;
+        // Block high energy features
+        delay(5000); 
+        return; // Skip rest of loop
     }
+
     float accX, accY, accZ;
     M5.Imu.getAccelData(&accX, &accY, &accZ);
+
+    // 4. Proactive Vision (Auto Observe)
+    // Detect subtle vibration (e.g., sitting down) when plugged in
     static unsigned long lastAutoObserveTime = 0;
     static unsigned long vibrationStartTime = 0;
     static bool isVibrating = false;
+
+    // Only active if battery is charging (plugged in) or high enough
+    // And don't spam: wait at least 5 minutes between proactive checks
     if (M5.Power.isCharging() && millis() - lastAutoObserveTime > 300000) {
+        // Simple vibration threshold (lower than shake)
         if (abs(accX) > 1.2 || abs(accY) > 1.2) {
-            if (!isVibrating) {
-                isVibrating = true;
-                vibrationStartTime = millis();
-            } else {
-                if (millis() - vibrationStartTime > 2000) {
-                    lastAutoObserveTime = millis();
-                    isVibrating = false;
-                    if (CoreS3.Camera.get()) {
-                        memset(audioBuffer, 0, 1024);
-                        sendInteraction(CoreS3.Camera.fb, audioBuffer, 1024, "AUTO_OBSERVE");
-                        CoreS3.Camera.free();
-                    }
-                }
-            }
+             if (!isVibrating) {
+                 isVibrating = true;
+                 vibrationStartTime = millis();
+             } else {
+                 // If vibration stops or settles after 2 seconds
+                 if (millis() - vibrationStartTime > 2000) {
+                      // Trigger Auto Observe
+                      lastAutoObserveTime = millis();
+                      isVibrating = false;
+                      
+                      // Silent Capture (Don't change screen)
+                      if (CoreS3.Camera.get()) {
+                           // Send with specific trigger
+                           // Send empty audio buffer
+                           memset(audioBuffer, 0, 1024);
+                           sendInteraction(CoreS3.Camera.fb, audioBuffer, 1024, "AUTO_OBSERVE");
+                           CoreS3.Camera.free();
+                      }
+                 }
+             }
         } else {
             isVibrating = false;
         }
     }
+
+    // 1. Shake Detection (Explicit High-G Shake)
     static unsigned long lastShakeTime = 0;
-    if (abs(accX) > 2.5 && millis() - lastShakeTime > 3000) {
+    if (abs(accX) > 2.5 && millis() - lastShakeTime > 3000) { 
         lastShakeTime = millis();
         drawIcon("DIZZY!", ORANGE, "dizzy");
-        memset(audioBuffer, 0, 1024);
+        memset(audioBuffer, 0, 1024); 
         sendInteraction(nullptr, audioBuffer, 1024, "SHAKE_EVENT");
-        delay(2000);
+        delay(2000); 
         drawIcon("Touch Me", BLUE, "none");
     }
+
+    // 2. Orientation
     static bool isUpsideDown = false;
     if (accZ < -0.9) {
         if (!isUpsideDown) {
             isUpsideDown = true;
-            M5.Lcd.setRotation(3);
-            memset(audioBuffer, 0, 1024);
+            M5.Lcd.setRotation(3); 
+            memset(audioBuffer, 0, 1024); 
             sendInteraction(nullptr, audioBuffer, 1024, "UPSIDE_DOWN");
         }
     } else if (accZ > 0.5) {
         if (isUpsideDown) {
             isUpsideDown = false;
-            M5.Lcd.setRotation(1);
+            M5.Lcd.setRotation(1); 
         }
     }
+
+    // 3. Touch Interaction
     if (M5.Touch.getCount() > 0) {
         auto detail = M5.Touch.getDetail(0);
+        
         if (detail.wasPressed()) {
-            M5.Speaker.tone(800, 50);
-            M5.Lcd.drawCircle(detail.x, detail.y, 20, WHITE);
+             M5.Speaker.tone(800, 50); 
+             M5.Lcd.drawCircle(detail.x, detail.y, 20, WHITE);
         }
+        
         if (detail.wasReleased()) {
             drawIcon("Listening...", ORANGE, "ear");
             M5.Mic.record(audioBuffer, AUDIO_BUF_SIZE, SAMPLE_RATE);
             while (M5.Mic.isRecording()) delay(10);
+
+            // 2. Latency Masking: Play "Thinking" sound immediately
+            // playThinkingSound(); // (Pseudocode)
+
             drawIcon("Thinking...", PURPLE, "load");
             if (CoreS3.Camera.get()) {
-                sendInteraction(CoreS3.Camera.fb, audioBuffer, AUDIO_BUF_SIZE);
-                CoreS3.Camera.free();
+                 sendInteraction(CoreS3.Camera.fb, audioBuffer, AUDIO_BUF_SIZE);
+                 CoreS3.Camera.free();
             } else {
-                drawIcon("Cam Fail", RED, "none");
-                delay(1000);
+                 drawIcon("Cam Fail", RED, "none");
+                 delay(1000);
             }
             drawIcon("Touch Me", BLUE, "none");
         }

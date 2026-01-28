@@ -9,10 +9,10 @@
 // ==========================================
 // CONFIGURATION
 // ==========================================
-const char* SERVER_HOST   = "moodsoul-platform.vercel.app"; // Update with your actual Vercel URL
+const char* SERVER_HOST   = "moodsoul-platform-gb2h.vercel.app"; // Updated to your deployed project URL
 const int   SERVER_PORT   = 443; // HTTPS
 const char* SERVER_PATH   = "/api/interact";
-const char* UPDATE_URL    = "https://moodsoul-platform.vercel.app/api/firmware"; 
+const char* UPDATE_URL    = "https://moodsoul-platform-gb2h.vercel.app/api/firmware"; 
 String      DEVICE_ID     = ""; // Will be set from MAC
 const char* CURRENT_VERSION = "1.1"; 
 
@@ -417,10 +417,13 @@ void setup() {
     // 1. WiFi Provisioning (WiFiManager)
     // ------------------------------------------
     drawIcon("Setup WiFi", YELLOW, "load");
+    M5.Lcd.qrcode("WIFI:S:MoodSoul_Setup;T:nopass;;", 40, 20, 240, 6);
+    M5.Lcd.setCursor(10, 210);
+    M5.Lcd.setTextSize(1);
+    M5.Lcd.setTextColor(WHITE);
+    M5.Lcd.println("Scan to join AP");
     WiFiManager wm;
-    // wm.resetSettings(); // Uncomment to wipe settings for testing
-    
-    bool res = wm.autoConnect("MoodSoul_Setup", "password123"); 
+    bool res = wm.autoConnect("MoodSoul_Setup"); 
     if(!res) {
         drawIcon("WiFi Fail", RED, "none");
         // ESP.restart();

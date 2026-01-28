@@ -15,10 +15,27 @@ function BindingContent() {
 
   useEffect(() => {
     if (deviceId) {
-      // Simulate connection delay
-      setTimeout(() => setStatus('FORM'), 1500);
+      // Check if already bound
+      fetch(`/api/check_binding?deviceId=${deviceId}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.bound) {
+                // Already bound, skip form
+                setStatus('SUCCESS');
+                setTimeout(() => {
+                    router.push('/dashboard');
+                }, 1500);
+            } else {
+                // Not bound, show form
+                setTimeout(() => setStatus('FORM'), 1500);
+            }
+        })
+        .catch(() => {
+            // Error checking, default to form
+            setTimeout(() => setStatus('FORM'), 1500);
+        });
     }
-  }, [deviceId]);
+  }, [deviceId, router]);
 
   const handleBind = async () => {
     if (!name) return alert("Please enter your name");
