@@ -9,12 +9,12 @@
 // ==========================================
 // CONFIGURATION
 // ==========================================
-const char* SERVER_HOST   = "moodsoul-platform-gb2h.vercel.app"; // Updated to your deployed project URL
+const char* SERVER_HOST   = "moodsoul-platform-gb2h.vercel.app"; // Reverted to valid URL
 const int   SERVER_PORT   = 443; // HTTPS
 const char* SERVER_PATH   = "/api/interact";
 const char* UPDATE_URL    = "https://moodsoul-platform-gb2h.vercel.app/api/firmware"; 
 String      DEVICE_ID     = ""; // Will be set from MAC
-const char* CURRENT_VERSION = "1.1"; 
+const char* CURRENT_VERSION = "1.3"; 
 
 // Audio Settings
 #define RECORD_TIME_SEC 3
@@ -24,6 +24,7 @@ uint8_t* audioBuffer = nullptr;
 
 const char* BINDING_CHECK_PATH = "/api/check_binding";
 Preferences preferences;
+int current_rotation = 0;
 
 void drawIcon(const char* label, uint16_t color, const char* iconType);
 
@@ -49,46 +50,111 @@ void checkBinding() {
     
     M5.Lcd.fillScreen(BLACK);
     
-    // Resize QR to fit: 180px box, centered horizontally (320w), top margin 10
-    // x = (320-180)/2 = 70
-    M5.Lcd.qrcode(bindUrl, 70, 10, 180, 6);
+    // Top Bar: Reset WiFi
+    M5.Lcd.fillRect(0, 0, 320, 25, DARKGREY);
+    M5.Lcd.setTextDatum(MC_DATUM);
+    M5.Lcd.setTextSize(1);
+    M5.Lcd.setTextColor(WHITE);
+    M5.Lcd.drawString("TAP HERE TO RESET WIFI", 160, 12);
+
+    // QR Code (Smaller to fit)
+    // y = 35, size = 130
+    M5.Lcd.qrcode(bindUrl, 95, 35, 130, 6);
     
-    // Make ID readable
+    // ID Info
     M5.Lcd.setTextDatum(MC_DATUM); // Middle Center
     M5.Lcd.setTextColor(ORANGE);
-    M5.Lcd.setTextSize(2); // Bigger text
-    M5.Lcd.drawString("ID:", 160, 205);
-    M5.Lcd.setTextColor(WHITE);
-    M5.Lcd.drawString(DEVICE_ID, 160, 225); // Display ID clearly at bottom
+    M5.Lcd.setTextSize(2); 
+    M5.Lcd.drawString("ID: " + DEVICE_ID, 160, 180);
     
-    HTTPClient http;
+    // Version & Server
+    M5.Lcd.setTextSize(1);
+    M5.Lcd.setTextColor(LIGHTGREY);
+    M5.Lcd.drawString("v" + String(CURRENT_VERSION) + " | " + String(SERVER_HOST), 160, 200);
+    
     // Loop until bound
     while (!isBound) {
-        // Poll API every 2 seconds
-        // Note: Ensure your backend has this endpoint implementing the check logic
-        String apiPath = String("https://") + SERVER_HOST + BINDING_CHECK_PATH + "?deviceId=" + DEVICE_ID;
-        http.begin(apiPath);
-        int code = http.GET();
-        
-        if (code == 200) {
-            String res = http.getString();
-            if (res.indexOf("\"bound\":true") >= 0) {
-                isBound = true;
-                preferences.putBool("is_bound", true);
-                
-                M5.Speaker.tone(1000, 200); // Success Beep
-                delay(200);
-                M5.Speaker.tone(2000, 400);
-                
-                M5.Lcd.fillScreen(BLACK);
-                drawIcon("SOUL LINKED!", GREEN, "none");
-                delay(2000);
+        // Check for WiFi Reset Touch
+        M5.update();
+        if (M5.Touch.getCount() > 0) {
+            auto t = M5.Touch.getDetail(0);
+            if (t.y < 40) { // Top area
+                 M5.Lcd.fillScreen(RED);
+                 M5.Lcd.drawString("RESETTING WIFI...", 160, 120);
+                 WiFiManager wm;
+                 wm.resetSettings();
+                 delay(1000);
+                 ESP.restart();
             }
+        }
+
+        // Check WiFi Status
+        if (WiFi.status() != WL_CONNECTED) {
+             M5.Lcd.fillRect(0, 210, 320, 30, BLACK);
+             M5.Lcd.setTextColor(RED);
+             M5.Lcd.drawString("WiFi Lost! Resetting...", 160, 220);
+             delay(2000);
+             ESP.restart();
+        }
+
+        WiFiClientSecure client;
+        client.setInsecure(); // Skip certificate verification
+        client.setHandshakeTimeout(60); // Increase handshake timeout
+        
+        HTTPClient http;
+        http.setConnectTimeout(30000); // 30s connect timeout
+        http.setTimeout(30000); // 30s total timeout
+
+        // Poll API every 5 seconds
+        String apiPath = String("https://") + SERVER_HOST + BINDING_CHECK_PATH + "?deviceId=" + DEVICE_ID;
+        
+        // DEBUG: WiFi Status (Line 1)
+        M5.Lcd.fillRect(0, 210, 320, 15, BLACK);
+        M5.Lcd.setTextSize(1);
+        M5.Lcd.setTextColor(YELLOW);
+        M5.Lcd.setTextDatum(ML_DATUM); // Middle Left
+        M5.Lcd.drawString("WiFi: " + WiFi.SSID(), 5, 217);
+        M5.Lcd.setTextDatum(MR_DATUM); // Middle Right
+        M5.Lcd.drawString(WiFi.localIP().toString(), 315, 217);
+
+        // DEBUG: HTTP Status (Line 2)
+        M5.Lcd.fillRect(0, 225, 320, 15, BLACK);
+        M5.Lcd.setTextDatum(MC_DATUM);
+
+        if (http.begin(client, apiPath)) {
+            int code = http.GET();
+            
+            if (code == 200) {
+                 M5.Lcd.setTextColor(GREEN);
+                 M5.Lcd.drawString("Status: 200 OK", 160, 232);
+            } else {
+                 M5.Lcd.setTextColor(RED);
+                 String errStr = (code < 0) ? http.errorToString(code) : String(code);
+                 M5.Lcd.drawString("Err: " + errStr, 160, 232);
+            }
+
+            if (code == 200) {
+                String res = http.getString();
+                if (res.indexOf("\"bound\":true") >= 0) {
+                    isBound = true;
+                    preferences.putBool("is_bound", true);
+                    
+                    M5.Speaker.tone(1000, 200); 
+                    delay(200);
+                    M5.Speaker.tone(2000, 400);
+                    
+                    M5.Lcd.fillScreen(BLACK);
+                    drawIcon("SOUL LINKED!", GREEN, "none");
+                    delay(2000);
+                }
+            }
+        } else {
+            M5.Lcd.setTextColor(RED);
+            M5.Lcd.drawString("Begin Failed", 160, 232);
         }
         http.end();
         
-        delay(2000);
-        M5.update();
+        delay(5000); // Wait 5s before retry
     }
     preferences.end();
 }
@@ -151,6 +217,23 @@ void drawMouth(int volume) {
     M5.Lcd.fillEllipse(cx, cy, 30, height/2, BLACK); // Inner mouth
 }
 
+void setMoodcubeOrientation(int mode) {
+    sensor_t* s = esp_camera_sensor_get();
+    if (mode == 0) {
+        M5.Lcd.setRotation(0);
+        if (s) {
+            s->set_vflip(s, 0);
+            s->set_hmirror(s, 0);
+        }
+    } else {
+        M5.Lcd.setRotation(2);
+        if (s) {
+            s->set_vflip(s, 1);
+            s->set_hmirror(s, 1);
+        }
+    }
+    current_rotation = mode;
+}
 // ==========================================
 // OTA UPDATE CHECK
 // ==========================================
@@ -517,19 +600,13 @@ void loop() {
     }
 
     // 2. Orientation
-    static bool isUpsideDown = false;
-    if (accZ < -0.9) {
-        if (!isUpsideDown) {
-            isUpsideDown = true;
-            M5.Lcd.setRotation(3); 
-            memset(audioBuffer, 0, 1024); 
-            sendInteraction(nullptr, audioBuffer, 1024, "UPSIDE_DOWN");
-        }
-    } else if (accZ > 0.5) {
-        if (isUpsideDown) {
-            isUpsideDown = false;
-            M5.Lcd.setRotation(1); 
-        }
+    static int lastMode = -1;
+    int targetMode = current_rotation;
+    if (accY > 0.8) targetMode = 0;
+    else if (accY < -0.8) targetMode = 2;
+    if (targetMode != lastMode) {
+        setMoodcubeOrientation(targetMode);
+        lastMode = targetMode;
     }
 
     // 3. Touch Interaction
@@ -542,6 +619,11 @@ void loop() {
         }
         
         if (detail.wasReleased()) {
+                if (abs(detail.x - 160) < 80 && abs(detail.y - 120) < 80) {
+                    setMoodcubeOrientation(current_rotation == 0 ? 2 : 0);
+                    drawIcon("Touch Me", BLUE, "none");
+                    return;
+                }
             drawIcon("Listening...", ORANGE, "ear");
             M5.Mic.record(audioBuffer, AUDIO_BUF_SIZE, SAMPLE_RATE);
             while (M5.Mic.isRecording()) delay(10);
