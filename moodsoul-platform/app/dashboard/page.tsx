@@ -72,6 +72,18 @@ export default function DashboardPage() {
   const handleBind = async () => {
     if (!deviceId) return;
     setIsBinding(true);
+
+    // Register device if it doesn't exist
+    try {
+      await fetch('/api/bind', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId, ownerName: 'Dashboard User' })
+      });
+    } catch (e) {
+      console.error("Bind error", e);
+    }
+
     await fetchDeviceStatus(deviceId);
     setIsBinding(false);
     showNotification("DEVICE LINKED");
