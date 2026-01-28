@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         .insert({
           device_id: deviceId,
           // pairing_token: token, // Removed: Column might be missing
-          current_mode: 'PET',
+          // current_mode: 'PET', // Removed: Avoid check constraint violation
           // archetype: 'Default Soul', // Removed
           active_persona_id: defaultPersona?.id,
           // voice_id: 'default', // Removed: Column missing in DB

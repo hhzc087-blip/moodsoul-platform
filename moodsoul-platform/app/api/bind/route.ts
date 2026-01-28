@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 
     // If it's a new record (not found in DB), add default fields
     if (!existing) {
-        updates.current_mode = 'PET';
+        // updates.current_mode = 'PET'; // Removed: Avoid check constraint violation if DB expects different value
         // updates.archetype = 'Default Soul'; // Removed: Column dropped from DB
         
         // Fetch default persona (Toxic Cat or first available)
