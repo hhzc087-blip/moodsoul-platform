@@ -60,7 +60,7 @@ export async function POST(request: Request) {
             updates.active_persona_id = defaultPersona.id;
         }
 
-        updates.voice_id = 'default';
+        // updates.voice_id = 'default'; // Removed: Column missing in DB
         // updates.daily_interactions_count = 0; // Removed: Might be missing in some DB versions, safe to skip (default is 0 in DB)
         
         // Generate a random UUID for owner_id to satisfy constraints if any,  

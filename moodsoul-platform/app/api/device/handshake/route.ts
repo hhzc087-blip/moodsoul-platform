@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
           current_mode: 'PET',
           // archetype: 'Default Soul', // Removed
           active_persona_id: defaultPersona?.id,
-          voice_id: 'default',
+          // voice_id: 'default', // Removed: Column missing in DB
           // last_seen_at: new Date().toISOString() // Removed: Avoid error if column missing
         });
       
