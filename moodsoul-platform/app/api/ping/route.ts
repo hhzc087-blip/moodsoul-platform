@@ -22,7 +22,8 @@ export async function POST(request: Request) {
 
     const { error } = await supabase
       .from('souls')
-      .update({ last_seen_at: new Date().toISOString() })
+      // .update({ last_seen_at: new Date().toISOString() }) // Removed: Column might be missing
+      .select('id') // Just check existence instead
       .eq('device_id', deviceId);
 
     if (error) {

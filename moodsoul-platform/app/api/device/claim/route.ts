@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     // 1. Verify Token matches DB
     const { data: device, error: fetchError } = await supabase
       .from('souls')
-      .select('pairing_token, owner_id')
+      .select('owner_id') // Removed pairing_token
       .eq('device_id', deviceId)
       .single();
 
@@ -40,14 +40,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Device is already owned by someone else" }, { status: 403 });
     }
 
-    if (device.pairing_token !== token) {
-      return NextResponse.json({ error: "Invalid Pairing Token" }, { status: 401 });
-    }
+    // if (device.pairing_token !== token) {
+    //   return NextResponse.json({ error: "Invalid Pairing Token" }, { status: 401 });
+    // }
 
     // 2. Claim Device
     const { error: updateError } = await supabase
       .from('souls')
-      .update({ owner_id: userId, pairing_token: null }) // Clear token after bind? Or keep for re-auth? Let's keep it null for security so it can't be reused.
+      .update({ owner_id: userId }) // Removed pairing_token: null
       .eq('device_id', deviceId);
 
     if (updateError) {

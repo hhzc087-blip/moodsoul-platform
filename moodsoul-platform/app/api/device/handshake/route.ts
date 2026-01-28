@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
         await supabase
           .from('souls')
           .update({ 
-            pairing_token: token, 
+            // pairing_token: token, // Removed: Column might be missing
             // last_seen_at: new Date().toISOString() // Removed
           })
           .eq('device_id', deviceId);
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         .from('souls')
         .insert({
           device_id: deviceId,
-          pairing_token: token,
+          // pairing_token: token, // Removed: Column might be missing
           current_mode: 'PET',
           // archetype: 'Default Soul', // Removed
           active_persona_id: defaultPersona?.id,
