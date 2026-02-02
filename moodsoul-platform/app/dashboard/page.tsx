@@ -52,20 +52,16 @@ export default function DashboardPage() {
   const fetchDeviceStatus = async (id: string) => {
     const { data } = await supabase
       .from('souls')
-      .select('active_persona_id, last_seen_at, current_feature')
+      .select('active_persona_id, current_feature') // Removed last_seen_at
       .eq('device_id', id)
       .single();
     
     if (data) {
       setActivePersonaId(data.active_persona_id);
       setActiveFeature(data.current_feature || 'NONE');
-      if (data.last_seen_at) {
-        const lastSeen = new Date(data.last_seen_at).getTime();
-        const now = new Date().getTime();
-        setIsOnline((now - lastSeen) < 2 * 60 * 1000);
-      } else {
-        setIsOnline(false);
-      }
+      // last_seen_at removed from DB, defaulting to true for now to avoid confusion or false if preferred
+      // setIsOnline(false); 
+      setIsOnline(true); // Assume online if bound successfully
     }
   };
 

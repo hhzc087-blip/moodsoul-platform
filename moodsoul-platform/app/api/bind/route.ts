@@ -41,7 +41,7 @@ export async function POST(request: Request) {
         // owner_name: ownerName, // Removed: Column missing in DB
         // is_bound: true, // Removed: Column missing in DB
         // birth_date: new Date().toISOString(), // Removed: Column missing in DB
-        last_seen_at: new Date().toISOString(), // Ensure device appears ONLINE immediately
+        // last_seen_at: new Date().toISOString(), // Removed: Column missing in DB
     };
 
     // If it's a new record (not found in DB), add default fields
